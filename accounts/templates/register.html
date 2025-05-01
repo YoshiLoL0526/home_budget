@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% load form_filters %}
+{% block title %}
+  Registro - Mi Casa
+{% endblock %}
+{% block content %}
+  <div class="row justify-content-center mt-5">
+    <div class="col-lg-6 col-md-8">
+      <div class="card">
+        <div class="card-header" style="background-color: var(--primary-color); color: var(--white);">
+          <h3 class="mb-0">
+            <i class="fa-solid fa-user-plus me-2"></i>{% block form_title %}
+              Crear cuenta
+            {% endblock %}
+          </h3>
+        </div>
+        <div class="card-body p-4">
+          <p class="text-muted mb-4">Completa el formulario para registrarte en Mi Casa</p>
+          <form method="post">
+            {% csrf_token %}
+            {% for field in form %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label fw-bold">{{ field.label }}</label>
+                {% if field.errors %}
+                  {{ field|attr:'class:form-control is-invalid' }}
+                  <div class="invalid-feedback">{{ field.errors|striptags }}</div>
+                {% else %}
+                  {{ field|attr:'class:form-control' }}
+                {% endif %}
+                {% if field.help_text %}
+                  <small class="form-text text-muted">{{ field.help_text }}</small>
+                {% endif %}
+              </div>
+            {% endfor %}
+            <div class="d-grid gap-2 mt-4">
+              <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus me-2"></i>Registrarse</button>
+            </div>
+            <div class="text-center mt-3">
+              <p>
+                ¿Ya tienes cuenta? <a href="{% url 'login' %}" class="text-decoration-none" style="color: var(--primary-color);">Iniciar sesión</a>
+              </p>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

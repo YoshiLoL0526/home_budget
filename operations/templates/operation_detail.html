@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}
+  Detalle de la Operación
+{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card mb-4">
+        <div class="card-header bg-white py-3">
+          <h2 class="mb-0"><i class="fa-solid fa-receipt me-2"></i>Detalle de la Operación</h2>
+        </div>
+        <div class="card-body">
+          <dl class="row">
+            <dt class="col-sm-4 col-lg-3 text-muted">
+              <i class="fa-solid fa-tag me-2"></i>Categoría:
+            </dt>
+            <dd class="col-sm-8 col-lg-9 mb-2">{{ operation.category }}</dd>
+
+            <dt class="col-sm-4 col-lg-3 text-muted">
+              <i class="fa-solid fa-coins me-2"></i>Monto:
+            </dt>
+            <dd class="col-sm-8 col-lg-9 mb-2">{{ operation.amount }}</dd>
+
+            <dt class="col-sm-4 col-lg-3 text-muted">
+              <i class="fa-solid fa-calendar me-2"></i>Fecha:
+            </dt>
+            <dd class="col-sm-8 col-lg-9 mb-2">{{ operation.date }}</dd>
+
+            <dt class="col-sm-4 col-lg-3 text-muted">
+              <i class="fa-solid fa-comment me-2"></i>Descripción:
+            </dt>
+            <dd class="col-sm-8 col-lg-9 mb-2">{{ operation.description|default:'Sin descripción' }}</dd>
+
+            <dt class="col-sm-4 col-lg-3 text-muted">
+              <i class="fa-solid fa-clock me-2"></i>Fecha de creación:
+            </dt>
+            <dd class="col-sm-8 col-lg-9 mb-2">{{ operation.created_at }}</dd>
+
+            <dt class="col-sm-4 col-lg-3 text-muted">
+              <i class="fa-solid fa-clock-rotate-left me-2"></i>Última actualización:
+            </dt>
+            <dd class="col-sm-8 col-lg-9">{{ operation.updated_at }}</dd>
+          </dl>
+
+          <div class="mt-4 d-flex justify-content-between">
+            <a href="{% url 'operation-list' %}" class="btn btn-secondary"><i class="fa-solid fa-arrow-left me-2"></i>Volver</a>
+            <div>
+              <a href="{% url 'operation-update' operation.id %}" class="btn btn-warning me-2"><i class="fa-solid fa-pen-to-square me-1"></i>Editar</a>
+              <a href="{% url 'operation-delete' operation.id %}" class="btn btn-danger"><i class="fa-solid fa-trash me-1"></i>Eliminar</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

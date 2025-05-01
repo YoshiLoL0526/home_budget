@@ -1,0 +1,409 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load i18n %}
+{% load filters %}
+
+{% block title %}{% trans "Monthly Report" %} | {% trans "Expense Tracker" %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{% trans "Monthly Expense Report" %}</h1>
+        <div>
+            <a href="{% url 'dashboard' %}" class="btn btn-sm btn-secondary">
+                <i class="fas fa-arrow-left fa-sm text-white-50"></i> {% trans "Back to Dashboard" %}
+            </a>
+            <button class="btn btn-sm btn-primary dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-download fa-sm text-white-50"></i> {% trans "Export" %}
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+                <li><a class="dropdown-item" href="?{{ request.GET.urlencode }}&export=excel">{% trans "Excel" %}</a></li>
+                <li><a class="dropdown-item" href="?{{ request.GET.urlencode }}&export=pdf">{% trans "PDF" %}</a></li>
+            </ul>
+            <button class="btn btn-sm btn-success" type="button" data-bs-toggle="modal" data-bs-target="#saveReportModal">
+                <i class="fas fa-save fa-sm text-white-50"></i> {% trans "Save Report" %}
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Card -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">{% trans "Filter Options" %}</h6>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label for="year" class="form-label">{% trans "Year" %}</label>
+                    <select name="year" id="year" class="form-select">
+                        {% for y in "2020"|get_range:year|add:"1" %}
+                            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="month" class="form-label">{% trans "Month" %}</label>
+                    <select name="month" id="month" class="form-select">
+                        {% for m in "1 2 3 4 5 6 7 8 9 10 11 12"|split:" " %}
+                            <option value="{{ m }}" {% if m == month|stringformat:"i" %}selected{% endif %}>
+                                {{ m|month_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="start_date" class="form-label">{% trans "Start Date" %}</label>
+                    {{ form.start_date }}
+                </div>
+                <div class="col-md-3">
+                    <label for="end_date" class="form-label">{% trans "End Date" %}</label>
+                    {{ form.end_date }}
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">{% trans "Apply Filters" %}</button>
+                </div>
+                <div class="col-12 mt-3">
+                    <label for="categories" class="form-label">{% trans "Categories" %}</label>
+                    {{ form.categories }}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Total Card -->
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                {% trans "Total Expenses" %}</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ currency }} {{ total_expenses|floatformat:2 }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Date Range Card -->
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">{% trans "Date Range" %}
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ start_date|date:"M d, Y" }} - {{ end_date|date:"M d, Y" }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories Count Card -->
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                {% trans "Categories" %}</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ expenses_by_category|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-tags fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Pie Chart -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">{% trans "Expenses by Category" %}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-pie mb-4">
+                        <canvas id="expensesByCategoryPie"></canvas>
+                    </div>
+                    <div class="mt-4 text-center small">
+                        {% for item in expenses_by_category %}
+                        <span class="mr-2">
+                            <i class="fas fa-circle" style="color: {{ item.category__color }}"></i> {{ item.category__name }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bar Chart -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">{% trans "Category Comparison" %}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar">
+                        <canvas id="expensesByCategoryBar"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Line Chart -->
+        <div class="col-lg-12 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">{% trans "Weekly Expense Trend" %}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="expenseTrend"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Categories Table -->
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">{% trans "Expense Categories" %}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="categoriesTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>{% trans "Category" %}</th>
+                                    <th>{% trans "Amount" %}</th>
+                                    <th>{% trans "% of Total" %}</th>
+                                    <th>{% trans "Count" %}</th>
+                                    <th>{% trans "Average" %}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in expenses_by_category %}
+                                <tr>
+                                    <td>
+                                        <span class="badge rounded-pill" style="background-color: {{ item.category__color }}">
+                                            &nbsp;
+                                        </span>
+                                        {{ item.category__name }}
+                                    </td>
+                                    <td>{{ currency }} {{ item.total|floatformat:2 }}</td>
+                                    <td>{{ item.total|floatformat:2|default:0|dividedby:total_expenses|mul:100|floatformat:1 }}%</td>
+                                    <td>{{ item.count }}</td>
+                                    <td>{{ currency }} {{ item.avg|floatformat:2 }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">{% trans "No expenses found for the selected period." %}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th>{% trans "Total" %}</th>
+                                    <th>{{ currency }} {{ total_expenses|floatformat:2 }}</th>
+                                    <th>100%</th>
+                                    <th>{{ expenses_by_category|length }}</th>
+                                    <th>-</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save Report Modal -->
+<div class="modal fade" id="saveReportModal" tabindex="-1" aria-labelledby="saveReportModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="saveReportModalLabel">{% trans "Save Report" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{% url 'reports:save_report' %}" method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">{% trans "Report Name" %}</label>
+                        {{ save_report_form.name }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="report_type" class="form-label">{% trans "Report Type" %}</label>
+                        {{ save_report_form.report_type }}
+                    </div>
+                    <!-- Hidden fields to preserve filter state -->
+                    <input type="hidden" name="start_date" value="{{ start_date|date:'Y-m-d' }}">
+                    <input type="hidden" name="end_date" value="{{ end_date|date:'Y-m-d' }}">
+                    {% for category in form.categories.value %}
+                    <input type="hidden" name="categories" value="{{ category.id }}">
+                    {% endfor %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Close" %}</button>
+                    <button type="submit" class="btn btn-primary">{% trans "Save Report" %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Parse the chart data from Django
+    const pieChartData = JSON.parse('{{ pie_chart_data|safe }}');
+    const barChartData = JSON.parse('{{ bar_chart_data|safe }}');
+    const trendChartData = JSON.parse('{{ trend_chart_data|safe }}');
+    
+    // Create pie chart
+    const ctxPie = document.getElementById('expensesByCategoryPie').getContext('2d');
+    const expensesByCategoryPieChart = new Chart(ctxPie, {
+        type: 'doughnut',
+        data: pieChartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            const value = context.raw;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total * 100) * 10) / 10;
+                            label += '{{ currency }} ' + value.toFixed(2) + ' (' + percentage + '%)';
+                            return label;
+                        }
+                    }
+                }
+            },
+            cutout: '60%'
+        }
+    });
+    
+    // Create bar chart
+    const ctxBar = document.getElementById('expensesByCategoryBar').getContext('2d');
+    const expensesByCategoryBarChart = new Chart(ctxBar, {
+        type: 'bar',
+        data: barChartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '{{ currency }} ' + value.toFixed(0);
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += '{{ currency }} ' + context.raw.toFixed(2);
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Create trend chart
+    const ctxTrend = document.getElementById('expenseTrend').getContext('2d');
+    const expenseTrendChart = new Chart(ctxTrend, {
+        type: 'line',
+        data: trendChartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    grid: {
+                        drawBorder: false,
+                        display: false
+                    }
+                },
+                y: {
+                    grid: {
+                        drawBorder: false,
+                        display: true
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return '{{ currency }} ' + value.toFixed(0);
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += '{{ currency }} ' + context.raw.toFixed(2);
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Initialize date inputs with current values
+    document.addEventListener('DOMContentLoaded', function() {
+        const startDateInput = document.getElementById('id_start_date');
+        const endDateInput = document.getElementById('id_end_date');
+        
+        if (startDateInput && !startDateInput.value) {
+            startDateInput.value = '{{ start_date|date:"Y-m-d" }}';
+        }
+        
+        if (endDateInput && !endDateInput.value) {
+            endDateInput.value = '{{ end_date|date:"Y-m-d" }}';
+        }
+    });
+</script>
+{% endblock %}

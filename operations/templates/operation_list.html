@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Operaciones
+{% endblock %}
+
+{% block content %}
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h1 class="mb-0"><i class="fa-solid fa-money-bill me-2" style="color: var(--primary-color);"></i>Mis Operaciones</h1>
+            <p class="text-muted mt-2">Administra tus operaciones de gastos e ingresos.</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <a href="{% url 'operation-create' %}" class="btn btn-primary">
+                <i class="fa-solid fa-plus me-2"></i>Nueva Operación
+            </a>
+        </div>
+    </div>
+    
+    <!-- Tarjetas de resumen -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card h-100 border-0">
+                <div class="card-body text-center">
+                    <i class="fa-solid fa-arrow-down text-danger mb-2" style="font-size: 1.8rem;"></i>
+                    <h5 class="text-muted">Total Gastos</h5>
+                    <h3 class="text-danger fw-bold">{{ expenses_total|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 border-0">
+                <div class="card-body text-center">
+                    <i class="fa-solid fa-arrow-up text-success mb-2" style="font-size: 1.8rem;"></i>
+                    <h5 class="text-muted">Total Ingresos</h5>
+                    <h3 class="text-success fw-bold">{{ income_total|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 border-0">
+                <div class="card-body text-center">
+                    <i class="fa-solid fa-chart-line text-primary mb-2" style="font-size: 1.8rem;"></i>
+                    <h5 class="text-muted">Balance Neto</h5>
+                    <h3 class="fw-bold {% if net_total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ net_total|floatformat:2 }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filtros -->
+    <div class="card mb-4 border-0">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="fa-solid fa-filter me-2"></i>Filtros</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label for="category" class="form-label">Categoría</label>
+                    <select name="category" id="category" class="form-select">
+                        <option value="">Todas</option>
+                        {% for category in categories %}
+                            <option value="{{ category.id }}" {% if current_filters.category == category.id|stringformat:"i" %}selected{% endif %}>
+                                <i class="{{ category.icon }}"></i> {{ category.name }} 
+                                {% if category.type == 'ingreso' %}(Ingreso){% else %}(Gasto){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="start_date" class="form-label">Fecha inicial</label>
+                    <input type="date" class="form-control" id="start_date" name="start_date" value="{{ current_filters.start_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="end_date" class="form-label">Fecha final</label>
+                    <input type="date" class="form-control" id="end_date" name="end_date" value="{{ current_filters.end_date }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fa-solid fa-search me-1"></i>Filtrar
+                    </button>
+                    <a href="{% url 'operation-list' %}" class="btn btn-outline-secondary">
+                        <i class="fa-solid fa-broom me-1"></i>Limpiar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Lista de operaciones -->
+    {% if operation_list %}
+        <div class="card border-0">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th><i class="fa-solid fa-calendar-day me-1"></i> Fecha</th>
+                                <th><i class="fa-solid fa-tag me-1"></i> Categoría</th>
+                                <th><i class="fa-solid fa-align-left me-1"></i> Descripción</th>
+                                <th class="text-end"><i class="fa-solid fa-coins me-1"></i> Monto</th>
+                                <th class="text-center"><i class="fa-solid fa-sliders me-1"></i> Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for operation in operation_list %}
+                                <tr>
+                                    <td>{{ operation.date|date:"d/m/Y" }}</td>
+                                    <td>
+                                        <span class="badge" style="background-color: {{ operation.category.color }};">
+                                            <i class="fa-solid {{ operation.category.icon }} me-1"></i>
+                                            {{ operation.category.name }}
+                                        </span>
+                                    </td>
+                                    <td>{{ operation.description|truncatechars:30 }}</td>
+                                    <td class="text-end {% if operation.category.type == 'ingreso' %}text-success{% else %}text-danger{% endif %} fw-bold">
+                                        {% if operation.category.type == 'ingreso' %}+{% else %}-{% endif %}
+                                        {{ operation.amount }}
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="{% url 'operation-detail' operation.id %}" class="btn btn-sm btn-light me-1" title="Ver detalles">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'operation-update' operation.id %}" class="btn btn-sm btn-light me-1" title="Editar">
+                                            <i class="fa-solid fa-edit text-warning"></i>
+                                        </a>
+                                        <a href="{% url 'operation-delete' operation.id %}" class="btn btn-sm btn-light" title="Eliminar">
+                                            <i class="fa-solid fa-trash text-danger"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Paginación -->
+                {% if is_paginated %}
+                    <nav class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=1{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+                                        <i class="fa-solid fa-angles-left"></i>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+                                        <i class="fa-solid fa-angle-left"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                            
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ num }}</span>
+                                    </li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">{{ num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+                                        <i class="fa-solid fa-angle-right"></i>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in current_filters.items %}&{{ key }}={{ value }}{% endfor %}">
+                                        <i class="fa-solid fa-angles-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <div class="d-flex align-items-center">
+                <i class="fa-solid fa-info-circle me-3" style="font-size: 2rem;"></i>
+                <div>
+                    <h5 class="mb-1">No hay registros</h5>
+                    <p class="mb-0">No se encontraron operaciones con los filtros seleccionados.</p>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

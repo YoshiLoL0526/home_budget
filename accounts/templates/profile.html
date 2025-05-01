@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+  Mi Perfil
+{% endblock %}
+
+{% block content %}
+  <div class="row">
+    <div class="col-lg-4 mb-4">
+      <div class="card">
+        <div class="card-header" style="background-color: var(--primary-color); color: var(--white);">
+          <h5 class="mb-0"><i class="fa-solid fa-user me-1"></i>Perfil de Usuario</h5>
+        </div>
+        <div class="card-body text-center">
+          {% if user.userprofile.profile_picture %}
+            <img src="{{ user.userprofile.profile_picture.url }}" class="rounded-circle img-fluid mb-3" style="max-width: 150px;" />
+          {% else %}
+            <img src="{% static "img/default_profile.png" %}" class="rounded-circle img-fluid mb-3" style="max-width: 150px;" />
+          {% endif %}
+          <h4>{{ user.username }}</h4>
+          <p class="text-muted">{{ user.email }}</p>
+          <p>
+            {% if user.first_name or user.last_name %}
+              {{ user.first_name }} {{ user.last_name }}
+            {% endif %}
+          </p>
+          <div class="d-flex justify-content-between small text-muted mt-3">
+            <span><i class="far fa-clock me-1"></i>Zona horaria: {{ user.userprofile.timezone }}</span>
+            <span><i class="fas fa-coins me-1"></i>Moneda: {{ user.userprofile.currency }}</span>
+          </div>
+        </div>
+      </div>
+
+      {% if user.userprofile.monthly_budget %}
+        <div class="card mt-4">
+          <div class="card-header" style="background-color: var(--primary-color); color: var(--white);">
+            <h5 class="mb-0">Presupuesto mensual</h5>
+          </div>
+          <div class="card-body text-center">
+            <h3>{{ user.userprofile.monthly_budget }} {{ user.userprofile.currency }}</h3>
+            <p class="text-muted">
+              <i class="fas fa-chart-pie me-1"></i>Presupuesto actual
+            </p>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header" style="background-color: var(--primary-color); color: var(--white);">
+          <h5 class="mb-0"><i class="fa-solid fa-edit me-1"></i>Editar información</h5>
+        </div>
+        <div class="card-body">
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <h5 class="border-bottom pb-2 mb-3"><i class="fas fa-user me-2"></i>Datos personales</h5>
+            {% for field in u_form %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                  <div class="invalid-feedback d-block">{{ field.errors|striptags }}</div>
+                {% endif %}
+                {% if field.help_text %}
+                  <small class="form-text text-muted">{{ field.help_text }}</small>
+                {% endif %}
+              </div>
+            {% endfor %}
+
+            <h5 class="border-bottom pb-2 mb-3 mt-4"><i class="fas fa-cog me-2"></i>Preferencias</h5>
+            {% for field in p_form %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                  <div class="invalid-feedback d-block">{{ field.errors|striptags }}</div>
+                {% endif %}
+                {% if field.help_text %}
+                  <small class="form-text text-muted">{{ field.help_text }}</small>
+                {% endif %}
+              </div>
+            {% endfor %}
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+              <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Guardar cambios</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

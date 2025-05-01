@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header bg-danger text-white">
+          <h5 class="mb-0"><i class="fa-solid fa-trash-can me-2"></i>Confirmar eliminación</h5>
+        </div>
+        <div class="card-body">
+          <div class="text-center mb-4">
+            <i class="fa-solid fa-triangle-exclamation text-danger" style="font-size: 3rem;"></i>
+            <h4 class="mt-3">¿Estás seguro?</h4>
+            <p>¿Estás seguro de que deseas eliminar esta operación?</p>
+            <dl class="row bg-light p-3 rounded border mb-4">
+              <dt class="col-sm-4 text-muted">
+              <i class="fas fa-tag me-2"></i>Categoría:
+              </dt>
+              <dd class="col-sm-8 fw-bold">{{ operation.category }}</dd>
+
+              <dt class="col-sm-4 text-muted">
+              <i class="fas fa-euro-sign me-2"></i>Monto:
+              </dt>
+              <dd class="col-sm-8 fw-bold">{{ operation.amount }}</dd>
+
+              <dt class="col-sm-4 text-muted">
+              <i class="fas fa-calendar-alt me-2"></i>Fecha:
+              </dt>
+              <dd class="col-sm-8 fw-bold">{{ operation.date }}</dd>
+
+              <dt class="col-sm-4 text-muted">
+              <i class="fas fa-align-left me-2"></i>Descripción:
+              </dt>
+              <dd class="col-sm-8">{{ operation.description|default:'Sin descripción' }}</dd>
+            </dl>
+          </div>
+
+          <form method="post" class="d-flex justify-content-between">
+            {% csrf_token %}
+            <a href="{% url 'category-list' %}" class="btn btn-outline-secondary"><i class="fa-solid fa-xmark me-2"></i>Cancelar</a>
+            <button type="submit" class="btn btn-danger"><i class="fa-solid fa-trash me-2"></i>Sí, eliminar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,595 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load i18n %}
+{% load filters %}
+
+{% block title %}
+  {% trans 'Dashboard' %}
+{% endblock %}
+
+{% block content %}
+  <div class="row mb-4 align-items-center">
+    <div class="col-md-8">
+      <h1 class="mb-0"><i class="fa-solid fa-chart-simple me-2" style="color: var(--primary-color);"></i>Financial Dashboard</h1>
+      <p class="text-muted mt-2">Visualiza tu situación financiera de un vistazo con gráficos y métricas clave</p>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Summary Cards -->
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card border-left-danger shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                {% trans 'Monthly Expenses' %}
+              </div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ currency }} {{ monthly_expenses|floatformat:2 }}</div>
+              <div class="small mt-2">
+                {% if expense_change_pct > 0 %}
+                  <span class="text-danger"><i class="fa-solid fa-arrow-up"></i> {{ expense_change_pct|floatformat:1 }}% vs. last month</span>
+                {% elif expense_change_pct < 0 %}
+                  <span class="text-success"><i class="fa-solid fa-arrow-down"></i> {{ expense_change_pct|abs|floatformat:1 }}% vs. last month</span>
+                {% else %}
+                  <span class="text-muted">No change vs. last month</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-auto">
+              <i class="fa-solid fa-money-bill fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card border-left-success shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                {% trans 'Monthly Income' %}
+              </div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ currency }} {{ monthly_income|floatformat:2 }}</div>
+              <div class="small mt-2">
+                {% if income_change_pct > 0 %}
+                  <span class="text-success"><i class="fa-solid fa-arrow-up"></i> {{ income_change_pct|floatformat:1 }}% vs. last month</span>
+                {% elif income_change_pct < 0 %}
+                  <span class="text-danger"><i class="fa-solid fa-arrow-down"></i> {{ income_change_pct|abs|floatformat:1 }}% vs. last month</span>
+                {% else %}
+                  <span class="text-muted">No change vs. last month</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-auto">
+              <i class="fa-solid fa-sack-dollar fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card border-left-{% if monthly_balance >= 0 %}primary{% else %}warning{% endif %} shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-{% if monthly_balance >= 0 %}primary{% else %}warning{% endif %} text-uppercase mb-1">
+                {% trans 'Monthly Balance' %}
+              </div>
+              <div class="h5 mb-0 font-weight-bold text-{% if monthly_balance >= 0 %}success{% else %}danger{% endif %}">{{ currency }} {{ monthly_balance|floatformat:2 }}</div>
+              <div class="small mt-2">
+                {% if monthly_income > 0 %}
+                  <span class="text-{% if monthly_balance >= 0 %}success{% else %}danger{% endif %}">
+                    {% widthratio monthly_balance|abs monthly_income 100 %}% of income{% if monthly_balance < 0 %}over budget{% endif %}
+                  </span>
+                {% else %}
+                  <span class="text-muted">No income this month</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-auto">
+              <i class="fa-solid fa-scale-balanced fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Budget Progress -->
+    <div class="col-xl-3 col-md-6 mb-4">
+      {% if monthly_budget %}
+        <div class="card border-left-info shadow h-100 py-2">
+          <div class="card-body">
+            <div class="row no-gutters align-items-center">
+              <div class="col mr-2">
+                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                  {% trans 'Budget' %}
+                </div>
+                <div class="row no-gutters align-items-center">
+                  <div class="col-auto">
+                    <div class="h5 mb-0 mr-3 font-weight-bold text-{% if budget_percentage > 100 %}danger{% else %}gray-800{% endif %}">{{ budget_percentage|floatformat:1 }}%</div></div>
+                  <div class="col">
+                    <div class="progress progress-sm mr-2">
+                      <div class="progress-bar {% if budget_percentage < 20 %}bg-danger{% elif budget_percentage < 70 %}bg-warning{% else %}bg-success{% endif %}"
+                        role="progressbar"
+                        style="width: {{ budget_percentage|floatformat:0 }}%"
+                        aria-valuenow="{{ budget_percentage|floatformat:0 }}"
+                        aria-valuemin="0"
+                        aria-valuemax="100"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="small mt-2">
+                  {% if days_left_in_month > 0 %}
+                    <div class="text-muted">{{ days_left_in_month }} days left</div>
+                    {% if daily_budget_left > 0 %}
+                      <div class="text-info">{{ currency }} {{ daily_budget_left|floatformat:2 }} daily budget left</div>
+                    {% else %}
+                      <div class="text-danger">Budget exceeded</div>
+                    {% endif %}
+                  {% endif %}
+                </div>
+              </div>
+              <div class="col-auto">
+                <i class="fa-solid fa-clipboard-list fa-2x text-gray-300"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="card border-left-secondary shadow h-100 py-2">
+          <div class="card-body">
+            <div class="row no-gutters align-items-center">
+              <div class="col mr-2">
+                <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">
+                  {% trans 'Budget' %}
+                </div>
+                <div class="h5 mb-0 font-weight-bold text-gray-500">Not Set</div>
+                <div class="small mt-2">
+                  <a href="{% url 'profile' %}" class="text-decoration-none">Set monthly budget</a>
+                </div>
+              </div>
+              <div class="col-auto">
+                <i class="fa-solid fa-gear fa-2x text-gray-300"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Daily Trend Chart -->
+    <div class="col-lg-8 mb-4">
+      <div class="card shadow mb-4">
+      <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+        <h6 class="m-0 font-weight-bold text-primary">{% trans 'Daily Income & Expenses' %}</h6>
+        <div class="btn-group" role="group" aria-label="Report options">
+        <a href="{% url 'reports:monthly_report' %}" class="btn btn-sm btn-outline-primary">
+          <i class="fa-solid fa-calendar-days"></i> {% trans 'Monthly Report' %}
+        </a>
+        <a href="{% url 'reports:annual_report' %}" class="btn btn-sm btn-outline-primary">
+          <i class="fa-solid fa-calendar"></i> {% trans 'Annual Report' %}
+        </a>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="chart-area" style="height: 300px;">
+        <canvas id="dailyTrendChart"></canvas>
+        </div>
+        <div class="mt-4 small text-center">
+        <p class="text-muted">
+          {% trans 'This chart shows your daily income and expenses for the current month. You can hover over any point to see the exact values.' %}
+        </p>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- Income vs Expenses -->
+    <div class="col-lg-4 mb-4">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3">
+          <h6 class="m-0 font-weight-bold text-primary">{% trans 'Income vs Expenses' %}</h6>
+        </div>
+        <div class="card-body">
+          <div class="chart-pie" style="height: 250px;">
+            <canvas id="incomeExpenseChart"></canvas>
+          </div>
+          <div class="mt-4 text-center small">
+            <span class="mr-2">
+              <i class="fa-solid fa-circle" style="color: #28a745"></i>
+              {% trans 'Income' %}: {{ currency }} {{ monthly_income|floatformat:2 }}
+            </span>
+            <br />
+            <span class="mr-2">
+              <i class="fa-solid fa-circle" style="color: #dc3545"></i>
+              {% trans 'Expenses' %}: {{ currency }} {{ monthly_expenses|floatformat:2 }}
+            </span>
+            <br />
+            <span class="mt-2 d-block">
+              {% if monthly_balance >= 0 %}
+                <span class="text-success"><i class="fa-solid fa-circle-plus"></i> {{ currency }} {{ monthly_balance|floatformat:2 }} savings</span>
+              {% else %}
+                <span class="text-danger"><i class="fa-solid fa-circle-minus"></i> {{ currency }} {{ monthly_balance|abs|floatformat:2 }} deficit</span>
+              {% endif %}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Top Expense Categories -->
+    <div class="col-lg-6 mb-4">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+          <h6 class="m-0 font-weight-bold text-primary">{% trans 'Top Expense Categories' %}</h6>
+          <a href="{% url 'operation-list' %}" class="btn btn-sm btn-primary"><i class="fa-solid fa-list"></i> {% trans 'All Operations' %}</a>
+        </div>
+        <div class="card-body">
+          <div class="chart-pie mb-4" style="height: 200px;">
+            <canvas id="expensesByCategory"></canvas>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+              <thead>
+                <tr class="bg-light">
+                  <th>
+                    {% trans 'Category' %}
+                  </th>
+                  <th>
+                    {% trans 'Amount' %}
+                  </th>
+                  <th>
+                    {% trans '% of Total' %}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in top_expenses %}
+                  <tr>
+                    <td>
+                      <span class="badge rounded-pill" style="background-color: {{ item.category__color }}">&nbsp;</span>
+                      {{ item.category__name }}
+                    </td>
+                    <td>{{ currency }} {{ item.total|floatformat:2 }}</td>
+                    <td>
+                      {% widthratio item.total monthly_expenses 100 %}%
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="3" class="text-center">
+                      {% trans 'No expenses recorded this month.' %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Income Sources -->
+    <div class="col-lg-6 mb-4">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+          <h6 class="m-0 font-weight-bold text-primary">{% trans 'Income Sources' %}</h6>
+          <a href="{% url 'category-list' %}" class="btn btn-sm btn-primary"><i class="fa-solid fa-tags"></i> {% trans 'Manage Categories' %}</a>
+        </div>
+        <div class="card-body">
+          <div class="chart-pie mb-4" style="height: 200px;">
+            <canvas id="incomeByCategory"></canvas>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+              <thead>
+                <tr class="bg-light">
+                  <th>
+                    {% trans 'Source' %}
+                  </th>
+                  <th>
+                    {% trans 'Amount' %}
+                  </th>
+                  <th>
+                    {% trans '% of Total' %}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in income_by_category %}
+                  <tr>
+                    <td>
+                      <span class="badge rounded-pill" style="background-color: {{ item.category__color }}">&nbsp;</span>
+                      {{ item.category__name }}
+                    </td>
+                    <td>{{ currency }} {{ item.total|floatformat:2 }}</td>
+                    <td>
+                      {% widthratio item.total monthly_income 100 %}%
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="3" class="text-center">
+                      {% trans 'No income recorded this month.' %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Financial insights card -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3">
+          <h6 class="m-0 font-weight-bold text-primary">{% trans 'Financial Insights' %}</h6>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <div class="card h-100 border-left-primary shadow-sm">
+                <div class="card-body">
+                  <h5 class="card-title">{% trans 'Saving Rate' %}</h5>
+                  {% if monthly_income > 0 %}
+                    <h2 class="text-{% if monthly_balance >= 0 %}success{% else %}danger{% endif %}">
+                      {{ monthly_balance|div:monthly_income|mul:100|floatformat:1 }}%
+                    </h2>
+                    <p class="card-text small text-muted">
+                      {% if monthly_balance >= 0 %}
+                        {% trans 'You are saving' %} {{ monthly_balance|div:monthly_income|mul:100|floatformat:1 }}% {% trans 'of your income' %}
+                      {% else %}
+                        {% trans 'You are spending more than your income' %}
+                      {% endif %}
+                    </p>
+                  {% else %}
+                    <h2 class="text-muted">N/A</h2>
+                    <p class="card-text small text-muted">
+                      {% trans 'No income recorded this month' %}
+                    </p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-4 mb-3">
+              <div class="card h-100 border-left-info shadow-sm">
+                <div class="card-body">
+                  <h5 class="card-title">{% trans 'Biggest Expense' %}</h5>
+                  {% if top_expenses %}
+                    <h2>{{ top_expenses.0.category__name }}</h2>
+                    <p class="card-text small text-muted">
+                      {{ currency }} {{ top_expenses.0.total|floatformat:2 }}
+                      ({% widthratio top_expenses.0.total monthly_expenses 100 %}% {% trans 'of expenses' %})
+                    </p>
+                  {% else %}
+                    <h2 class="text-muted">N/A</h2>
+                    <p class="card-text small text-muted">
+                      {% trans 'No expenses recorded this month' %}
+                    </p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-4 mb-3">
+              <div class="card h-100 border-left-warning shadow-sm">
+                <div class="card-body">
+                  <h5 class="card-title">{% trans 'Daily Average' %}</h5>
+                  <h2>{{ currency }} {{ monthly_expenses|div:end_date.day|floatformat:2 }}</h2>
+                  <p class="card-text small text-muted">
+                    {% trans 'Average daily expense for this month' %}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row mt-3">
+            <div class="col-12">
+              <h5 class="card-subtitle mb-3">{% trans 'Recommendations' %}</h5>
+              <ul class="list-group">
+                {% if monthly_balance < 0 %}
+                  <li class="list-group-item text-danger">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                    {% trans 'Your expenses exceed your income by' %} {{ currency }} {{ monthly_balance|abs|floatformat:2 }}.{% trans 'Consider reducing expenses or finding additional income sources.' %}
+                  </li>
+                {% endif %}
+
+                {% if top_expenses and top_expenses.0.total > monthly_expenses|mul:0.4 %}
+                  <li class="list-group-item text-warning">
+                    <i class="fa-solid fa-lightbulb me-2"></i>
+                    {% trans 'Your biggest expense category' %}({{ top_expenses.0.category__name }}){% trans 'accounts for' %} {% widthratio top_expenses.0.total monthly_expenses 100 %}% {% trans 'of your total expenses. Consider if there are ways to reduce this expense.' %}
+                  </li>
+                {% endif %}
+
+                {% if monthly_budget and budget_percentage < 10 %}
+                  <li class="list-group-item text-warning">
+                    <i class="fa-solid fa-chart-simple me-2"></i>
+                    {% trans "You've used" %} {{ budget_percentage|floatformat:1 }}% {% trans 'of your monthly budget with' %}
+                    {{ days_left_in_month }} {% trans 'days remaining. Try to limit additional expenses this month.' %}
+                  </li>
+                {% endif %}
+
+                {% if monthly_balance > 0 and monthly_balance|div:monthly_income|mul:100 > 20 %}
+                  <li class="list-group-item text-success">
+                    <i class="fa-solid fa-piggy-bank me-2"></i>
+                    {% trans 'Great job saving' %} {{ monthly_balance|div:monthly_income|mul:100|floatformat:1 }}% {% trans 'of your income this month!' %}
+                  </li>
+                {% endif %}
+
+                {% if not monthly_budget %}
+                  <li class="list-group-item text-info">
+                    <i class="fa-solid fa-gear me-2"></i>
+                    {% trans 'Setting a monthly budget can help you manage your finances better. ' %}
+                    <a href="{% url 'profile' %}">{% trans 'Set up your budget now' %}</a>.
+                  </li>
+                {% endif %}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Parse the chart data from Django
+    let pieChartData = {}
+    let incomePieChartData = {}
+    let trendChartData = {}
+    let incomeChartData = {}
+    
+    try {
+      pieChartData = JSON.parse('{{ pie_chart_data|safe|escapejs }}')
+      incomePieChartData = JSON.parse('{{ income_pie_chart_data|safe|escapejs }}')
+      trendChartData = JSON.parse('{{ trend_chart_data|safe|escapejs }}')
+      incomeChartData = JSON.parse('{{ income_expense_chart_data|safe|escapejs}}')
+    } catch (e) {
+      console.error('Error parsing chart data:', e)
+      pieChartData = { labels: [], datasets: [{ data: [], backgroundColor: [] }] }
+      incomePieChartData = { labels: [], datasets: [{ data: [], backgroundColor: [] }] }
+      trendChartData = { labels: [], datasets: [{ data: [], backgroundColor: [], borderColor: [] }] }
+      incomeChartData = { labels: [], datasets: [{ data: [], backgroundColor: [] }] }
+    }
+    
+    // Expense Categories Chart
+    const expensesCtx = document.getElementById('expensesByCategory').getContext('2d')
+    if (expensesCtx) {
+      new Chart(expensesCtx, {
+        type: 'doughnut',
+        data: pieChartData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const label = context.label || ''
+                  const value = context.formattedValue
+                  const currency = '{{ currency }}'
+                  return `${label}: ${currency} ${value}`
+                }
+              }
+            }
+          }
+        }
+      })
+    }
+    
+    // Income Sources Chart
+    const incomeCtx = document.getElementById('incomeByCategory').getContext('2d')
+    if (incomeCtx) {
+      new Chart(incomeCtx, {
+        type: 'doughnut',
+        data: incomePieChartData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const label = context.label || ''
+                  const value = context.formattedValue
+                  const currency = '{{ currency }}'
+                  return `${label}: ${currency} ${value}`
+                }
+              }
+            }
+          }
+        }
+      })
+    }
+    
+    // Daily Trend Chart
+    const trendCtx = document.getElementById('dailyTrendChart').getContext('2d')
+    if (trendCtx) {
+      new Chart(trendCtx, {
+        type: 'line',
+        data: trendChartData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const label = context.dataset.label || ''
+                  const value = context.formattedValue
+                  const currency = '{{ currency }}'
+                  return `${label}: ${currency} ${value}`
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                display: false
+              }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function (value) {
+                  return '{{ currency }} ' + value
+                }
+              }
+            }
+          }
+        }
+      })
+    }
+    
+    // Income vs Expenses Chart
+    const incomeExpenseCtx = document.getElementById('incomeExpenseChart').getContext('2d')
+    if (incomeExpenseCtx) {
+      new Chart(incomeExpenseCtx, {
+        type: 'pie',
+        data: incomeChartData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const label = context.label || ''
+                  const value = context.formattedValue
+                  const currency = '{{ currency }}'
+                  return `${label}: ${currency} ${value}`
+                }
+              }
+            }
+          }
+        }
+      })
+    }
+  </script>
+{% endblock %}
