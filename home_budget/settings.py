@@ -100,7 +100,8 @@ else:
             "HOST": os.environ.get("DB_HOST", "localhost"),
             "PORT": os.environ.get("DB_PORT", "5432"),
             "OPTIONS": {
-                "sslmode": "require",
+                "sslmode": os.getenv("DB_SSLMODE", "require"),
+                "sslrootcert": os.getenv("DB_SSLROOTCERT"),
             },
         }
     }
