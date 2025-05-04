@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+  Reporte Anual
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h3>Reporte Anual: {{ year }}</h3>
+        <div class="btn-group">
+          <button class="btn btn-primary dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fa-solid fa-download me-1"></i> Exportar
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="exportDropdown">
+            <li><a class="dropdown-item" href="{% url 'reports:export_annual_report' %}?format=excel&year={{ year }}"><i class="fa-solid fa-file-excel me-2"></i>Excel</a></li>
+            <li><a class="dropdown-item" href="{% url 'reports:export_annual_report' %}?format=pdf&year={{ year }}"><i class="fa-solid fa-file-pdf me-2"></i>PDF</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-body">
+        <form method="get" class="row g-3 mb-4">
+          <div class="col-md-4">
+            <label for="year" class="form-label">Año</label>
+            <select class="form-select" id="year" name="year">
+              {% for y in years %}
+                <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary">Ver reporte</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Resumen Anual -->
+<div class="row">
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-chart-pie me-2"></i>Resumen Anual</h5>
+      </div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span>Ingresos:</span>
+          <span class="text-success fw-bold">{{ currency }} {{ annual_income|floatformat:2 }}</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span>Gastos:</span>
+          <span class="text-danger fw-bold">{{ currency }} {{ annual_expenses|floatformat:2 }}</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span>Balance:</span>
+          <span class="fw-bold {% if annual_balance >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ currency }} {{ annual_balance|floatformat:2 }}
+          </span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+          <span>Tasa de ahorro:</span>
+          <span class="fw-bold {% if savings_rate >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ savings_rate|floatformat:1 }}%
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-chart-line me-2"></i>Comparación Anual</h5>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <span>Gastos vs. año anterior:</span>
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="progress w-75 mt-1">
+              <div class="progress-bar {% if expense_change_pct < 0 %}bg-success{% else %}bg-danger{% endif %}" 
+                   role="progressbar" 
+                   style="width: {{ expense_change_abs_pct }}%"
+                   aria-valuenow="{{ expense_change_abs_pct }}" 
+                   aria-valuemin="0" 
+                   aria-valuemax="100"></div>
+            </div>
+            <span class="ms-2 {% if expense_change_pct < 0 %}text-success{% else %}text-danger{% endif %}">
+              {{ expense_change_pct|floatformat:1 }}%
+            </span>
+          </div>
+        </div>
+        <div>
+          <span>Ingresos vs. año anterior:</span>
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="progress w-75 mt-1">
+              <div class="progress-bar {% if income_change_pct > 0 %}bg-success{% else %}bg-danger{% endif %}" 
+                   role="progressbar" 
+                   style="width: {{ income_change_abs_pct }}%"
+                   aria-valuenow="{{ income_change_abs_pct }}" 
+                   aria-valuemin="0" 
+                   aria-valuemax="100"></div>
+            </div>
+            <span class="ms-2 {% if income_change_pct > 0 %}text-success{% else %}text-danger{% endif %}">
+              {{ income_change_pct|floatformat:1 }}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-piggy-bank me-2"></i>Resumen Trimestral</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Trimestre</th>
+                <th>Ingresos</th>
+                <th>Gastos</th>
+                <th>Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for quarter in quarterly_data %}
+                <tr>
+                  <td>{{ quarter.quarter }}</td>
+                  <td class="text-success">{{ currency }} {{ quarter.income|floatformat:2 }}</td>
+                  <td class="text-danger">{{ currency }} {{ quarter.expenses|floatformat:2 }}</td>
+                  <td class="{% if quarter.balance >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ currency }} {{ quarter.balance|floatformat:2 }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Gráficos principales -->
+<div class="row">
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-chart-pie me-2"></i>Distribución de Gastos</h5>
+      </div>
+      <div class="card-body">
+        <canvas id="expensesChart" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-chart-line me-2"></i>Evolución Mensual</h5>
+      </div>
+      <div class="card-body">
+        <canvas id="dailyTrendChart" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tablas de detalle -->
+<div class="row">
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-list me-2"></i>Top Categorías de Gastos</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Categoría</th>
+                <th>Total</th>
+                <th>% del total</th>
+                <th>Operaciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for expense in top_expenses %}
+              <tr>
+                <td>
+                  <span class="badge rounded-pill me-1" style="background-color: {{ expense.category__color }}">•</span>
+                  {{ expense.category__name }}
+                </td>
+                <td>{{ currency }} {{ expense.total|floatformat:2 }}</td>
+                <td>{{ expense.percentage|floatformat:1 }}%</td>
+                <td>{{ expense.count }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-calendar-month me-2"></i>Meses con Mayor Gasto</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th>Total</th>
+                <th>% del año</th>
+                <th>Categoría principal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for month in top_spending_months %}
+              <tr>
+                <td>{{ month.month }}</td>
+                <td>{{ currency }} {{ month.total|floatformat:2 }}</td>
+                <td>{{ month.percentage|floatformat:1 }}%</td>
+                <td>
+                  {% if month.top_category %}
+                  <span class="badge rounded-pill me-1" style="background-color: {{ month.top_category_color }}">•</span>
+                  {{ month.top_category }}
+                  {% else %}
+                  -
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Análisis adicional -->
+<div class="row">
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-magnifying-glass me-2"></i>Análisis de Tendencias</h5>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <h6>Comparación anual (últimos 3 años)</h6>
+          <canvas id="yearlyComparisonChart" height="200"></canvas>
+        </div>
+        <div class="mt-4">
+          <h6>Análisis trimestral</h6>
+          <canvas id="quarterlyChart" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-lightbulb me-2"></i>Recomendaciones</h5>
+      </div>
+      <div class="card-body">
+        <ul class="list-group">
+          {% for recommendation in recommendations %}
+          <li class="list-group-item">
+            <div class="d-flex">
+              <div class="me-3">
+                <i class="fa-solid {{ recommendation.icon }} text-{{ recommendation.color }}"></i>
+              </div>
+              <div>
+                <h6 class="mb-1">{{ recommendation.title }}</h6>
+                <p class="mb-0 text-muted">{{ recommendation.description }}</p>
+              </div>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Configuración de los gráficos
+  document.addEventListener('DOMContentLoaded', function() {
+    // Declarar las variables de datos para los gráficos
+    let pieChartData = {};
+    let monthlyTrendChartData = {};
+    let yearlyComparisonChartData = {};
+    let quarterlyChartData = {};
+    
+    // Intentar parsear los datos JSON que vienen del contexto
+    try {
+      pieChartData = JSON.parse('{{ pie_chart_data|safe|escapejs }}');
+      monthlyTrendChartData = JSON.parse('{{ monthly_trend_chart_data|safe|escapejs }}');
+      yearlyComparisonChartData = JSON.parse('{{ yearly_comparison_chart_data|safe|escapejs }}');
+      quarterlyChartData = JSON.parse('{{ quarterly_chart_data|safe|escapejs }}');
+    } catch (e) {
+      console.error('Error al parsear los datos de los gráficos:', e);
+      pieChartData = { labels: [], datasets: [{ data: [], backgroundColor: [] }] };
+      monthlyTrendChartData = { labels: [], datasets: [{ data: [], backgroundColor: [], borderColor: [] }] };
+      yearlyComparisonChartData = { labels: [], datasets: [{ data: [], backgroundColor: [] }] };
+      quarterlyChartData = { labels: [], datasets: [{ data: [], backgroundColor: [] }] };
+    }
+    
+    // Gráfico de gastos por categoría
+    const expensesChartCtx = document.getElementById('expensesChart');
+    if (expensesChartCtx) {
+      const expensesChart = new Chart(expensesChartCtx.getContext('2d'), {
+        type: 'doughnut',
+        data: pieChartData,
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'right',
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.parsed || 0;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = Math.round((value / total) * 100);
+                  return `${label}: ${percentage}% ({{ currency }} ${value.toFixed(2)})`;
+                }
+              }
+            }
+          },
+          cutout: '60%'
+        }
+      });
+    } else {
+      console.error('No se encontró el elemento expensesChart');
+    }
+    
+    // Gráfico de tendencia mensual
+    const dailyTrendChartCtx = document.getElementById('dailyTrendChart');
+    if (dailyTrendChartCtx) {
+      const dailyTrendChart = new Chart(dailyTrendChartCtx.getContext('2d'), {
+        type: 'line',
+        data: monthlyTrendChartData,
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'top',
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `${context.dataset.label}: {{ currency }} ${context.parsed.y.toFixed(2)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                maxRotation: 45,
+                minRotation: 45
+              }
+            },
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    } else {
+      console.error('No se encontró el elemento dailyTrendChart');
+    }
+    
+    // Gráfico de comparación anual
+    const yearlyComparisonChartCtx = document.getElementById('yearlyComparisonChart');
+    if (yearlyComparisonChartCtx) {
+      const yearlyComparisonChart = new Chart(yearlyComparisonChartCtx.getContext('2d'), {
+        type: 'bar',
+        data: yearlyComparisonChartData,
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'top',
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `${context.dataset.label}: {{ currency }} ${context.parsed.y.toFixed(2)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    } else {
+      console.error('No se encontró el elemento yearlyComparisonChart');
+    }
+    
+    // Gráfico de análisis trimestral
+    const quarterlyChartCtx = document.getElementById('quarterlyChart');
+    if (quarterlyChartCtx) {
+      const quarterlyChart = new Chart(quarterlyChartCtx.getContext('2d'), {
+        type: 'bar',
+        data: quarterlyChartData,
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'top',
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `${context.dataset.label}: {{ currency }} ${context.parsed.y.toFixed(2)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    } else {
+      console.error('No se encontró el elemento quarterlyChart');
+    }
+  });
+</script>
+{% endblock %}

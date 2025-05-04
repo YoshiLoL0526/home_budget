@@ -889,6 +889,749 @@ def export_monthly_report(request):
 
 @login_required
 def annual_report(request):
-    """Detailed monthly report with analysis and projections"""
+    """Detailed annual report with analysis and projections"""
 
-    return render(request, "Not implemented yet")
+    # Get user's timezone
+    user_timezone = request.user.userprofile.timezone or "UTC"
+    current_tz = pytz.timezone(user_timezone)
+
+    # Get current date in user's timezone
+    today = timezone.now().astimezone(current_tz).date()
+
+    # Get requested year or default to current
+    year = int(request.GET.get("year", today.year))
+
+    # Create datetime objects for start and end of year
+    start_date = datetime(year, 1, 1)
+    end_date = datetime(year, 12, 31)
+
+    # Add timezone info
+    start_of_year = timezone.datetime.combine(start_date, timezone.datetime.min.time())
+    start_of_year = current_tz.localize(start_of_year)
+
+    end_of_year = timezone.datetime.combine(end_date, timezone.datetime.max.time())
+    end_of_year = current_tz.localize(end_of_year)
+
+    # Generate years for the selector
+    current_year = today.year
+    years = list(range(current_year - 5, current_year + 2))
+
+    # Annual totals
+    annual_expenses = (
+        Operation.objects.filter(
+            user=request.user,
+            date__gte=start_of_year,
+            date__lte=end_of_year,
+            category__type="gasto",
+        ).aggregate(Sum("amount"))["amount__sum"]
+        or 0
+    )
+
+    annual_income = (
+        Operation.objects.filter(
+            user=request.user,
+            date__gte=start_of_year,
+            date__lte=end_of_year,
+            category__type="ingreso",
+        ).aggregate(Sum("amount"))["amount__sum"]
+        or 0
+    )
+
+    # Calculate balance and savings rate
+    annual_balance = annual_income - annual_expenses
+    savings_rate = (annual_balance / annual_income * 100) if annual_income > 0 else 0
+
+    # Get last year data for comparison
+    last_year_start = datetime(year - 1, 1, 1)
+    last_year_end = datetime(year - 1, 12, 31)
+
+    last_year_start = timezone.datetime.combine(
+        last_year_start, timezone.datetime.min.time()
+    )
+    last_year_start = current_tz.localize(last_year_start)
+
+    last_year_end = timezone.datetime.combine(
+        last_year_end, timezone.datetime.max.time()
+    )
+    last_year_end = current_tz.localize(last_year_end)
+
+    last_year_expenses = (
+        Operation.objects.filter(
+            user=request.user,
+            date__gte=last_year_start,
+            date__lte=last_year_end,
+            category__type="gasto",
+        ).aggregate(Sum("amount"))["amount__sum"]
+        or 0
+    )
+
+    last_year_income = (
+        Operation.objects.filter(
+            user=request.user,
+            date__gte=last_year_start,
+            date__lte=last_year_end,
+            category__type="ingreso",
+        ).aggregate(Sum("amount"))["amount__sum"]
+        or 0
+    )
+
+    # Calculate percentage changes
+    expense_change_pct = (
+        ((annual_expenses - last_year_expenses) / last_year_expenses * 100)
+        if last_year_expenses > 0
+        else 0
+    )
+    income_change_pct = (
+        ((annual_income - last_year_income) / last_year_income * 100)
+        if last_year_income > 0
+        else 0
+    )
+
+    # For progress bars, we need absolute percentage values capped at 100%
+    expense_change_abs_pct = min(abs(expense_change_pct), 100)
+    income_change_abs_pct = min(abs(income_change_pct), 100)
+
+    # Get expenses by category with percentage of total
+    expenses_by_category = get_expenses_by_category(
+        request.user, start_of_year, end_of_year
+    )
+
+    # Add percentage calculation to each category
+    for expense in expenses_by_category:
+        expense["percentage"] = (
+            (expense["total"] / annual_expenses * 100) if annual_expenses > 0 else 0
+        )
+
+    # Get top 10 expenses
+    top_expenses = expenses_by_category[:10]
+
+    # Get monthly breakdown of expenses and income
+    monthly_expenses_data = []
+    monthly_income_data = []
+
+    for month in range(1, 13):
+        # Create datetime objects for start and end of month
+        month_start = datetime(year, month, 1)
+        if month == 12:
+            month_end = datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            month_end = datetime(year, month + 1, 1) - timedelta(days=1)
+
+        # Add timezone info
+        month_start = timezone.datetime.combine(
+            month_start, timezone.datetime.min.time()
+        )
+        month_start = current_tz.localize(month_start)
+
+        month_end = timezone.datetime.combine(month_end, timezone.datetime.max.time())
+        month_end = current_tz.localize(month_end)
+
+        # Get month name (abbreviated)
+        month_name = calendar.month_abbr[month]
+
+        # Get expenses and income for the month
+        month_expenses = (
+            Operation.objects.filter(
+                user=request.user,
+                date__gte=month_start,
+                date__lte=month_end,
+                category__type="gasto",
+            ).aggregate(Sum("amount"))["amount__sum"]
+            or 0
+        )
+
+        month_income = (
+            Operation.objects.filter(
+                user=request.user,
+                date__gte=month_start,
+                date__lte=month_end,
+                category__type="ingreso",
+            ).aggregate(Sum("amount"))["amount__sum"]
+            or 0
+        )
+
+        monthly_expenses_data.append(
+            {
+                "month": f"{month_name}",
+                "expenses": month_expenses,
+            }
+        )
+
+        monthly_income_data.append(
+            {
+                "month": f"{month_name}",
+                "income": month_income,
+            }
+        )
+
+    # Get top spending months with their main category
+    top_spending_months = []
+    for month_data in sorted(
+        monthly_expenses_data, key=lambda x: x["expenses"], reverse=True
+    )[:3]:
+        month_index = monthly_expenses_data.index(month_data) + 1
+        month_start = datetime(year, month_index, 1)
+        if month_index == 12:
+            month_end = datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            month_end = datetime(year, month_index + 1, 1) - timedelta(days=1)
+
+        month_start = timezone.datetime.combine(
+            month_start, timezone.datetime.min.time()
+        )
+        month_start = current_tz.localize(month_start)
+
+        month_end = timezone.datetime.combine(month_end, timezone.datetime.max.time())
+        month_end = current_tz.localize(month_end)
+
+        # Get top category for this month
+        month_top_category = (
+            Operation.objects.filter(
+                user=request.user,
+                date__gte=month_start,
+                date__lte=month_end,
+                category__type="gasto",
+            )
+            .values("category__name", "category__color")
+            .annotate(total=Sum("amount"))
+            .order_by("-total")
+            .first()
+        )
+
+        top_spending_months.append(
+            {
+                "month": month_data["month"],
+                "total": month_data["expenses"],
+                "percentage": (
+                    (month_data["expenses"] / annual_expenses * 100)
+                    if annual_expenses > 0
+                    else 0
+                ),
+                "top_category": (
+                    month_top_category["category__name"] if month_top_category else None
+                ),
+                "top_category_color": (
+                    month_top_category["category__color"]
+                    if month_top_category
+                    else None
+                ),
+            }
+        )
+
+    # Generate recommendations based on the data
+    recommendations = []
+
+    # Check if annual expenses exceed income
+    if annual_expenses > annual_income:
+        recommendations.append(
+            {
+                "title": _("Balance anual negativo"),
+                "description": _(
+                    "Tus gastos superan tus ingresos este año. Considera establecer un presupuesto más estricto."
+                ),
+                "icon": "fa-exclamation-triangle",
+                "color": "danger",
+            }
+        )
+
+    # Check if there's a category that takes up more than 30% of annual expenses
+    for category in top_expenses:
+        if category["percentage"] > 30:
+            recommendations.append(
+                {
+                    "title": _("Alta concentración de gastos anual"),
+                    "description": _(
+                        f'La categoría {category["category__name"]} representa el {category["percentage"]:.1f}% de tus gastos anuales.'
+                    ),
+                    "icon": "fa-chart-pie",
+                    "color": "info",
+                }
+            )
+            break
+
+    # Check for expense increase year over year
+    if expense_change_pct > 20:
+        recommendations.append(
+            {
+                "title": _("Aumento significativo de gastos"),
+                "description": _(
+                    f"Tus gastos han aumentado un {expense_change_pct:.1f}% respecto al año anterior."
+                ),
+                "icon": "fa-arrow-trend-up",
+                "color": "danger",
+            }
+        )
+
+    # Check for savings rate
+    if savings_rate < 10 and savings_rate >= 0:
+        recommendations.append(
+            {
+                "title": _("Tasa de ahorro anual baja"),
+                "description": _(
+                    "Tu tasa de ahorro anual es menor al 10%. Considera estrategias para incrementar tus ahorros."
+                ),
+                "icon": "fa-piggy-bank",
+                "color": "warning",
+            }
+        )
+    elif savings_rate >= 20:
+        recommendations.append(
+            {
+                "title": _("¡Excelente tasa de ahorro anual!"),
+                "description": _(
+                    f"Estás ahorrando el {savings_rate:.1f}% de tus ingresos anuales. ¡Felicidades!"
+                ),
+                "icon": "fa-award",
+                "color": "success",
+            }
+        )
+
+    # Prepare chart data
+    pie_chart_data = generate_chart_data(top_expenses, chart_type="pie")
+
+    # Prepare monthly trend chart data
+    monthly_trend_chart_data = {
+        "labels": [item["month"] for item in monthly_expenses_data],
+        "datasets": [
+            {
+                "label": "Gastos",
+                "data": [float(item["expenses"]) for item in monthly_expenses_data],
+                "borderColor": "#dc3545",
+                "backgroundColor": "rgba(220, 53, 69, 0.1)",
+                "fill": True,
+                "tension": 0.4,
+            },
+            {
+                "label": "Ingresos",
+                "data": [
+                    float(monthly_income_data[i]["income"])
+                    for i in range(len(monthly_income_data))
+                ],
+                "borderColor": "#28a745",
+                "backgroundColor": "rgba(40, 167, 69, 0.1)",
+                "fill": True,
+                "tension": 0.4,
+            },
+        ],
+    }
+
+    # Year over year comparison (last 3 years if available)
+    yearly_comparison_data = []
+    for i in range(2, -1, -1):  # Last 3 years including current
+        comparison_year = year - i
+
+        comparison_start = datetime(comparison_year, 1, 1)
+        comparison_end = datetime(comparison_year, 12, 31)
+
+        comparison_start = timezone.datetime.combine(
+            comparison_start, timezone.datetime.min.time()
+        )
+        comparison_start = current_tz.localize(comparison_start)
+
+        comparison_end = timezone.datetime.combine(
+            comparison_end, timezone.datetime.max.time()
+        )
+        comparison_end = current_tz.localize(comparison_end)
+
+        comparison_expenses = (
+            Operation.objects.filter(
+                user=request.user,
+                date__gte=comparison_start,
+                date__lte=comparison_end,
+                category__type="gasto",
+            ).aggregate(Sum("amount"))["amount__sum"]
+            or 0
+        )
+
+        comparison_income = (
+            Operation.objects.filter(
+                user=request.user,
+                date__gte=comparison_start,
+                date__lte=comparison_end,
+                category__type="ingreso",
+            ).aggregate(Sum("amount"))["amount__sum"]
+            or 0
+        )
+
+        yearly_comparison_data.append(
+            {
+                "year": str(comparison_year),
+                "expenses": comparison_expenses,
+                "income": comparison_income,
+            }
+        )
+
+    # Calculate quarterly data
+    quarterly_data = []
+    for quarter in range(1, 5):
+        start_month = (quarter - 1) * 3 + 1
+        end_month = quarter * 3
+
+        quarter_start = datetime(year, start_month, 1)
+        if end_month == 12:
+            quarter_end = datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            quarter_end = datetime(year, end_month + 1, 1) - timedelta(days=1)
+
+        quarter_start = timezone.datetime.combine(
+            quarter_start, timezone.datetime.min.time()
+        )
+        quarter_start = current_tz.localize(quarter_start)
+
+        quarter_end = timezone.datetime.combine(
+            quarter_end, timezone.datetime.max.time()
+        )
+        quarter_end = current_tz.localize(quarter_end)
+
+        quarter_expenses = (
+            Operation.objects.filter(
+                user=request.user,
+                date__gte=quarter_start,
+                date__lte=quarter_end,
+                category__type="gasto",
+            ).aggregate(Sum("amount"))["amount__sum"]
+            or 0
+        )
+
+        quarter_income = (
+            Operation.objects.filter(
+                user=request.user,
+                date__gte=quarter_start,
+                date__lte=quarter_end,
+                category__type="ingreso",
+            ).aggregate(Sum("amount"))["amount__sum"]
+            or 0
+        )
+
+        quarterly_data.append(
+            {
+                "quarter": f"Q{quarter}",
+                "expenses": quarter_expenses,
+                "income": quarter_income,
+                "balance": quarter_income - quarter_expenses,
+            }
+        )
+
+    # Prepare yearly comparison chart data
+    yearly_comparison_chart_data = {
+        "labels": [item["year"] for item in yearly_comparison_data],
+        "datasets": [
+            {
+                "label": "Gastos anuales",
+                "data": [float(item["expenses"]) for item in yearly_comparison_data],
+                "backgroundColor": "rgba(220, 53, 69, 0.7)",
+            },
+            {
+                "label": "Ingresos anuales",
+                "data": [float(item["income"]) for item in yearly_comparison_data],
+                "backgroundColor": "rgba(40, 167, 69, 0.7)",
+            },
+        ],
+    }
+
+    # Prepare quarterly chart data
+    quarterly_chart_data = {
+        "labels": [item["quarter"] for item in quarterly_data],
+        "datasets": [
+            {
+                "label": "Gastos trimestrales",
+                "data": [float(item["expenses"]) for item in quarterly_data],
+                "backgroundColor": "rgba(220, 53, 69, 0.7)",
+            },
+            {
+                "label": "Ingresos trimestrales",
+                "data": [float(item["income"]) for item in quarterly_data],
+                "backgroundColor": "rgba(40, 167, 69, 0.7)",
+            },
+        ],
+    }
+
+    context = {
+        "year": year,
+        "years": years,
+        "annual_expenses": annual_expenses,
+        "annual_income": annual_income,
+        "annual_balance": annual_balance,
+        "savings_rate": savings_rate,
+        "expense_change_pct": expense_change_pct,
+        "income_change_pct": income_change_pct,
+        "expense_change_abs_pct": expense_change_abs_pct,
+        "income_change_abs_pct": income_change_abs_pct,
+        "top_expenses": top_expenses,
+        "top_spending_months": top_spending_months,
+        "recommendations": recommendations,
+        "pie_chart_data": json.dumps(pie_chart_data),
+        "monthly_trend_chart_data": json.dumps(monthly_trend_chart_data),
+        "yearly_comparison_chart_data": json.dumps(yearly_comparison_chart_data),
+        "quarterly_chart_data": json.dumps(quarterly_chart_data),
+        "quarterly_data": quarterly_data,
+        "currency": request.user.userprofile.currency,
+    }
+    return render(request, "annual_report.html", context)
+
+
+@login_required
+def export_annual_report(request):
+    """Export annual report data to Excel or PDF"""
+    export_format = request.GET.get("format", "excel")
+    year = int(request.GET.get("year", timezone.now().year))
+
+    # Get user's timezone
+    user_timezone = request.user.userprofile.timezone or "UTC"
+    current_tz = pytz.timezone(user_timezone)
+
+    # Create datetime objects for start and end of year
+    start_date = datetime(year, 1, 1)
+    end_date = datetime(year, 12, 31)
+
+    # Add timezone info
+    start_of_year = timezone.datetime.combine(start_date, timezone.datetime.min.time())
+    start_of_year = current_tz.localize(start_of_year)
+
+    end_of_year = timezone.datetime.combine(end_date, timezone.datetime.max.time())
+    end_of_year = current_tz.localize(end_of_year)
+
+    # Prepare data for export
+    expenses_by_category = get_expenses_by_category(
+        request.user, start_of_year, end_of_year
+    )
+
+    # Annual totals
+    annual_expenses = (
+        Operation.objects.filter(
+            user=request.user,
+            date__gte=start_of_year,
+            date__lte=end_of_year,
+            category__type="gasto",
+        ).aggregate(Sum("amount"))["amount__sum"]
+        or 0
+    )
+
+    annual_income = (
+        Operation.objects.filter(
+            user=request.user,
+            date__gte=start_of_year,
+            date__lte=end_of_year,
+            category__type="ingreso",
+        ).aggregate(Sum("amount"))["amount__sum"]
+        or 0
+    )
+
+    annual_balance = annual_income - annual_expenses
+    savings_rate = (annual_balance / annual_income * 100) if annual_income > 0 else 0
+
+    # Format data for export
+    report_data = []
+
+    # Summary row
+    report_data.append(
+        {
+            "Sección": "Resumen Anual",
+            "Concepto": "Año",
+            "Valor": f"{year}",
+            "Adicional": "",
+        }
+    )
+    report_data.append(
+        {
+            "Sección": "Resumen Anual",
+            "Concepto": "Ingresos totales",
+            "Valor": annual_income,
+            "Adicional": request.user.userprofile.currency,
+        }
+    )
+    report_data.append(
+        {
+            "Sección": "Resumen Anual",
+            "Concepto": "Gastos totales",
+            "Valor": annual_expenses,
+            "Adicional": request.user.userprofile.currency,
+        }
+    )
+    report_data.append(
+        {
+            "Sección": "Resumen Anual",
+            "Concepto": "Balance anual",
+            "Valor": annual_balance,
+            "Adicional": request.user.userprofile.currency,
+        }
+    )
+    report_data.append(
+        {
+            "Sección": "Resumen Anual",
+            "Concepto": "Tasa de ahorro",
+            "Valor": f"{savings_rate:.1f}%",
+            "Adicional": "",
+        }
+    )
+
+    # Category breakdown
+    for category in expenses_by_category:
+        report_data.append(
+            {
+                "Sección": "Gastos por Categoría",
+                "Concepto": category["category__name"],
+                "Valor": category["total"],
+                "Adicional": (
+                    f"{(category['total'] / annual_expenses * 100):.1f}% del total"
+                    if annual_expenses > 0
+                    else "0.0%"
+                ),
+            }
+        )
+
+    # Monthly breakdown
+    for month in range(1, 13):
+        # Create datetime objects for start and end of month
+        month_start = datetime(year, month, 1)
+        if month == 12:
+            month_end = datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            month_end = datetime(year, month + 1, 1) - timedelta(days=1)
+
+        # Add timezone info
+        month_start = timezone.datetime.combine(
+            month_start, timezone.datetime.min.time()
+        )
+        month_start = current_tz.localize(month_start)
+
+        month_end = timezone.datetime.combine(month_end, timezone.datetime.max.time())
+        month_end = current_tz.localize(month_end)
+
+        # Get month name
+        month_name = calendar.month_name[month]
+
+        # Get expenses and income for the month
+        month_expenses = (
+            Operation.objects.filter(
+                user=request.user,
+                date__gte=month_start,
+                date__lte=month_end,
+                category__type="gasto",
+            ).aggregate(Sum("amount"))["amount__sum"]
+            or 0
+        )
+
+        month_income = (
+            Operation.objects.filter(
+                user=request.user,
+                date__gte=month_start,
+                date__lte=month_end,
+                category__type="ingreso",
+            ).aggregate(Sum("amount"))["amount__sum"]
+            or 0
+        )
+
+        month_balance = month_income - month_expenses
+
+        report_data.append(
+            {
+                "Sección": "Desglose Mensual",
+                "Concepto": month_name,
+                "Valor": f"Ingresos: {month_income}",
+                "Adicional": request.user.userprofile.currency,
+            }
+        )
+        report_data.append(
+            {
+                "Sección": "Desglose Mensual",
+                "Concepto": month_name,
+                "Valor": f"Gastos: {month_expenses}",
+                "Adicional": request.user.userprofile.currency,
+            }
+        )
+        report_data.append(
+            {
+                "Sección": "Desglose Mensual",
+                "Concepto": month_name,
+                "Valor": f"Balance: {month_balance}",
+                "Adicional": request.user.userprofile.currency,
+            }
+        )
+
+    # Quarterly breakdown
+    for quarter in range(1, 5):
+        start_month = (quarter - 1) * 3 + 1
+        end_month = quarter * 3
+
+        quarter_start = datetime(year, start_month, 1)
+        if end_month == 12:
+            quarter_end = datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            quarter_end = datetime(year, end_month + 1, 1) - timedelta(days=1)
+
+        quarter_start = timezone.datetime.combine(
+            quarter_start, timezone.datetime.min.time()
+        )
+        quarter_start = current_tz.localize(quarter_start)
+
+        quarter_end = timezone.datetime.combine(
+            quarter_end, timezone.datetime.max.time()
+        )
+        quarter_end = current_tz.localize(quarter_end)
+
+        quarter_expenses = (
+            Operation.objects.filter(
+                user=request.user,
+                date__gte=quarter_start,
+                date__lte=quarter_end,
+                category__type="gasto",
+            ).aggregate(Sum("amount"))["amount__sum"]
+            or 0
+        )
+
+        quarter_income = (
+            Operation.objects.filter(
+                user=request.user,
+                date__gte=quarter_start,
+                date__lte=quarter_end,
+                category__type="ingreso",
+            ).aggregate(Sum("amount"))["amount__sum"]
+            or 0
+        )
+
+        quarter_balance = quarter_income - quarter_expenses
+
+        report_data.append(
+            {
+                "Sección": "Desglose Trimestral",
+                "Concepto": f"Trimestre {quarter}",
+                "Valor": f"Ingresos: {quarter_income}",
+                "Adicional": request.user.userprofile.currency,
+            }
+        )
+        report_data.append(
+            {
+                "Sección": "Desglose Trimestral",
+                "Concepto": f"Trimestre {quarter}",
+                "Valor": f"Gastos: {quarter_expenses}",
+                "Adicional": request.user.userprofile.currency,
+            }
+        )
+        report_data.append(
+            {
+                "Sección": "Desglose Trimestral",
+                "Concepto": f"Trimestre {quarter}",
+                "Valor": f"Balance: {quarter_balance}",
+                "Adicional": request.user.userprofile.currency,
+            }
+        )
+
+    # Set filename
+    filename = f"Reporte_Anual_{year}"
+
+    if export_format == "excel":
+        # Export to Excel
+        output = export_to_excel(report_data, f"Reporte Anual {year}")
+        response = HttpResponse(
+            output.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}.xlsx"'
+        return response
+    else:
+        # Export to PDF
+        output = export_to_pdf(report_data)
+        response = HttpResponse(output.read(), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}.pdf"'
+        return response
