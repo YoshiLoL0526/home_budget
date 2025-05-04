@@ -1,409 +1,453 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
-{% load i18n %}
-{% load filters %}
 
-{% block title %}{% trans "Monthly Report" %} | {% trans "Expense Tracker" %}{% endblock %}
+{% block title %}
+  Reporte Mensual
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">{% trans "Monthly Expense Report" %}</h1>
-        <div>
-            <a href="{% url 'dashboard' %}" class="btn btn-sm btn-secondary">
-                <i class="fas fa-arrow-left fa-sm text-white-50"></i> {% trans "Back to Dashboard" %}
-            </a>
-            <button class="btn btn-sm btn-primary dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="fas fa-download fa-sm text-white-50"></i> {% trans "Export" %}
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="exportDropdown">
-                <li><a class="dropdown-item" href="?{{ request.GET.urlencode }}&export=excel">{% trans "Excel" %}</a></li>
-                <li><a class="dropdown-item" href="?{{ request.GET.urlencode }}&export=pdf">{% trans "PDF" %}</a></li>
-            </ul>
-            <button class="btn btn-sm btn-success" type="button" data-bs-toggle="modal" data-bs-target="#saveReportModal">
-                <i class="fas fa-save fa-sm text-white-50"></i> {% trans "Save Report" %}
-            </button>
+<div class="row">
+  <div class="col-12">
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h3>Reporte Mensual: {{ month_name }} {{ year }}</h3>
+        <div class="btn-group">
+          <button class="btn btn-primary dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fa-solid fa-download me-1"></i> Exportar
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="exportDropdown">
+            <li><a class="dropdown-item" href="{% url 'reports:export_monthly_report' %}?format=excel&month={{ month }}&year={{ year }}"><i class="fa-solid fa-file-excel me-2"></i>Excel</a></li>
+            <li><a class="dropdown-item" href="{% url 'reports:export_monthly_report' %}?format=pdf&month={{ month }}&year={{ year }}"><i class="fa-solid fa-file-pdf me-2"></i>PDF</a></li>
+          </ul>
         </div>
+      </div>
+      <div class="card-body">
+        <form method="get" class="row g-3 mb-4">
+          <div class="col-md-4">
+            <label for="month" class="form-label">Mes</label>
+            <select class="form-select" id="month" name="month">
+              {% for m in months %}
+                <option value="{{ m.0 }}" {% if m.0 == month %}selected{% endif %}>{{ m.1 }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label for="year" class="form-label">Año</label>
+            <select class="form-select" id="year" name="year">
+              {% for y in years %}
+                <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary">Ver reporte</button>
+          </div>
+        </form>
+      </div>
     </div>
-
-    <!-- Filter Card -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">{% trans "Filter Options" %}</h6>
-        </div>
-        <div class="card-body">
-            <form method="get" class="row g-3 align-items-end">
-                <div class="col-md-2">
-                    <label for="year" class="form-label">{% trans "Year" %}</label>
-                    <select name="year" id="year" class="form-select">
-                        {% for y in "2020"|get_range:year|add:"1" %}
-                            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label for="month" class="form-label">{% trans "Month" %}</label>
-                    <select name="month" id="month" class="form-select">
-                        {% for m in "1 2 3 4 5 6 7 8 9 10 11 12"|split:" " %}
-                            <option value="{{ m }}" {% if m == month|stringformat:"i" %}selected{% endif %}>
-                                {{ m|month_name }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label for="start_date" class="form-label">{% trans "Start Date" %}</label>
-                    {{ form.start_date }}
-                </div>
-                <div class="col-md-3">
-                    <label for="end_date" class="form-label">{% trans "End Date" %}</label>
-                    {{ form.end_date }}
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">{% trans "Apply Filters" %}</button>
-                </div>
-                <div class="col-12 mt-3">
-                    <label for="categories" class="form-label">{% trans "Categories" %}</label>
-                    {{ form.categories }}
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Total Card -->
-        <div class="col-xl-4 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                {% trans "Total Expenses" %}</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ currency }} {{ total_expenses|floatformat:2 }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-calendar fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Date Range Card -->
-        <div class="col-xl-4 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">{% trans "Date Range" %}
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ start_date|date:"M d, Y" }} - {{ end_date|date:"M d, Y" }}
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-calendar-alt fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Categories Count Card -->
-        <div class="col-xl-4 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                {% trans "Categories" %}</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ expenses_by_category|length }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-tags fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Pie Chart -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">{% trans "Expenses by Category" %}</h6>
-                </div>
-                <div class="card-body">
-                    <div class="chart-pie mb-4">
-                        <canvas id="expensesByCategoryPie"></canvas>
-                    </div>
-                    <div class="mt-4 text-center small">
-                        {% for item in expenses_by_category %}
-                        <span class="mr-2">
-                            <i class="fas fa-circle" style="color: {{ item.category__color }}"></i> {{ item.category__name }}
-                        </span>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Bar Chart -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">{% trans "Category Comparison" %}</h6>
-                </div>
-                <div class="card-body">
-                    <div class="chart-bar">
-                        <canvas id="expensesByCategoryBar"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Line Chart -->
-        <div class="col-lg-12 mb-4">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">{% trans "Weekly Expense Trend" %}</h6>
-                </div>
-                <div class="card-body">
-                    <div class="chart-area">
-                        <canvas id="expenseTrend"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Categories Table -->
-        <div class="col-12">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">{% trans "Expense Categories" %}</h6>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered" id="categoriesTable" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th>{% trans "Category" %}</th>
-                                    <th>{% trans "Amount" %}</th>
-                                    <th>{% trans "% of Total" %}</th>
-                                    <th>{% trans "Count" %}</th>
-                                    <th>{% trans "Average" %}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in expenses_by_category %}
-                                <tr>
-                                    <td>
-                                        <span class="badge rounded-pill" style="background-color: {{ item.category__color }}">
-                                            &nbsp;
-                                        </span>
-                                        {{ item.category__name }}
-                                    </td>
-                                    <td>{{ currency }} {{ item.total|floatformat:2 }}</td>
-                                    <td>{{ item.total|floatformat:2|default:0|dividedby:total_expenses|mul:100|floatformat:1 }}%</td>
-                                    <td>{{ item.count }}</td>
-                                    <td>{{ currency }} {{ item.avg|floatformat:2 }}</td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center">{% trans "No expenses found for the selected period." %}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <th>{% trans "Total" %}</th>
-                                    <th>{{ currency }} {{ total_expenses|floatformat:2 }}</th>
-                                    <th>100%</th>
-                                    <th>{{ expenses_by_category|length }}</th>
-                                    <th>-</th>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
 
-<!-- Save Report Modal -->
-<div class="modal fade" id="saveReportModal" tabindex="-1" aria-labelledby="saveReportModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="saveReportModalLabel">{% trans "Save Report" %}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="{% url 'reports:save_report' %}" method="post">
-                {% csrf_token %}
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="name" class="form-label">{% trans "Report Name" %}</label>
-                        {{ save_report_form.name }}
-                    </div>
-                    <div class="mb-3">
-                        <label for="report_type" class="form-label">{% trans "Report Type" %}</label>
-                        {{ save_report_form.report_type }}
-                    </div>
-                    <!-- Hidden fields to preserve filter state -->
-                    <input type="hidden" name="start_date" value="{{ start_date|date:'Y-m-d' }}">
-                    <input type="hidden" name="end_date" value="{{ end_date|date:'Y-m-d' }}">
-                    {% for category in form.categories.value %}
-                    <input type="hidden" name="categories" value="{{ category.id }}">
-                    {% endfor %}
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Close" %}</button>
-                    <button type="submit" class="btn btn-primary">{% trans "Save Report" %}</button>
-                </div>
-            </form>
+<!-- Resumen Mensual -->
+<div class="row">
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-chart-pie me-2"></i>Resumen Mensual</h5>
+      </div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span>Ingresos:</span>
+          <span class="text-success fw-bold">{{ currency }} {{ monthly_income|floatformat:2 }}</span>
         </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span>Gastos:</span>
+          <span class="text-danger fw-bold">{{ currency }} {{ monthly_expenses|floatformat:2 }}</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span>Balance:</span>
+          <span class="fw-bold {% if monthly_balance >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ currency }} {{ monthly_balance|floatformat:2 }}
+          </span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+          <span>Tasa de ahorro:</span>
+          <span class="fw-bold {% if savings_rate >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ savings_rate|floatformat:1 }}%
+          </span>
+        </div>
+      </div>
     </div>
+  </div>
+
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-chart-line me-2"></i>Comparación Mensual</h5>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <span>Gastos vs. mes anterior:</span>
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="progress w-75 mt-1">
+              <div class="progress-bar {% if expense_change_pct < 0 %}bg-success{% else %}bg-danger{% endif %}" 
+                   role="progressbar" 
+                   style="width: {{ expense_change_abs_pct }}%"
+                   aria-valuenow="{{ expense_change_abs_pct }}" 
+                   aria-valuemin="0" 
+                   aria-valuemax="100"></div>
+            </div>
+            <span class="ms-2 {% if expense_change_pct < 0 %}text-success{% else %}text-danger{% endif %}">
+              {{ expense_change_pct|floatformat:1 }}%
+            </span>
+          </div>
+        </div>
+        <div>
+          <span>Ingresos vs. mes anterior:</span>
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="progress w-75 mt-1">
+              <div class="progress-bar {% if income_change_pct > 0 %}bg-success{% else %}bg-danger{% endif %}" 
+                   role="progressbar" 
+                   style="width: {{ income_change_abs_pct }}%"
+                   aria-valuenow="{{ income_change_abs_pct }}" 
+                   aria-valuemin="0" 
+                   aria-valuemax="100"></div>
+            </div>
+            <span class="ms-2 {% if income_change_pct > 0 %}text-success{% else %}text-danger{% endif %}">
+              {{ income_change_pct|floatformat:1 }}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-piggy-bank me-2"></i>Presupuesto</h5>
+      </div>
+      <div class="card-body">
+        {% if monthly_budget %}
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span>Presupuesto mensual:</span>
+              <span class="fw-bold">{{ currency }} {{ monthly_budget|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span>Utilizado:</span>
+              <span class="fw-bold {% if budget_percentage > 30 %}text-success{% elif budget_percentage > 10 %}text-warning{% else %}text-danger{% endif %}">
+                {{ budget_used_percentage|floatformat:1 }}%
+              </span>
+            </div>
+            <div class="progress" style="height: 8px;">
+              <div class="progress-bar {% if budget_used_percentage < 70 %}bg-success{% elif budget_used_percentage < 90 %}bg-warning{% else %}bg-danger{% endif %}" 
+                   role="progressbar" 
+                   style="width: {{ budget_used_percentage }}%"
+                   aria-valuenow="{{ budget_used_percentage }}" 
+                   aria-valuemin="0" 
+                   aria-valuemax="100"></div>
+            </div>
+          </div>
+          <div>
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span>Restante:</span>
+              <span class="fw-bold {% if budget_remaining > 0 %}text-success{% else %}text-danger{% endif %}">
+                {{ currency }} {{ budget_remaining|floatformat:2 }}
+              </span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span>Presupuesto diario restante:</span>
+              <span class="fw-bold">{{ currency }} {{ daily_budget_left|floatformat:2 }}</span>
+            </div>
+          </div>
+        {% else %}
+          <div class="text-center py-4">
+            <p>No has establecido un presupuesto mensual.</p>
+            <a href="{% url 'profile' %}" class="btn btn-primary btn-sm">Configurar presupuesto</a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Gráficos principales -->
+<div class="row">
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-chart-pie me-2"></i>Distribución de Gastos</h5>
+      </div>
+      <div class="card-body">
+        <canvas id="expensesChart" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-chart-line me-2"></i>Evolución Diaria</h5>
+      </div>
+      <div class="card-body">
+        <canvas id="dailyTrendChart" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tablas de detalle -->
+<div class="row">
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-list me-2"></i>Top Categorías de Gastos</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Categoría</th>
+                <th>Total</th>
+                <th>% del total</th>
+                <th>Operaciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for expense in top_expenses %}
+              <tr>
+                <td>
+                  <span class="badge rounded-pill me-1" style="background-color: {{ expense.category__color }}">•</span>
+                  {{ expense.category__name }}
+                </td>
+                <td>{{ currency }} {{ expense.total|floatformat:2 }}</td>
+                <td>{{ expense.percentage|floatformat:1 }}%</td>
+                <td>{{ expense.count }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-calendar-day me-2"></i>Días con Mayor Gasto</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Total</th>
+                <th>% del mes</th>
+                <th>Categoría principal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for day in top_spending_days %}
+              <tr>
+                <td>{{ day.date|date:"d/m/Y" }}</td>
+                <td>{{ currency }} {{ day.total|floatformat:2 }}</td>
+                <td>{{ day.percentage|floatformat:1 }}%</td>
+                <td>
+                  {% if day.top_category %}
+                  <span class="badge rounded-pill me-1" style="background-color: {{ day.top_category_color }}">•</span>
+                  {{ day.top_category }}
+                  {% else %}
+                  -
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Análisis adicional -->
+<div class="row">
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-magnifying-glass me-2"></i>Análisis de Tendencias</h5>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <h6>Tendencia de gastos en los últimos 6 meses</h6>
+          <canvas id="sixMonthTrendChart" height="200"></canvas>
+        </div>
+        <div>
+          <h6 class="mt-4">Proyección para el próximo mes</h6>
+          <p>Basado en tus patrones de gasto, se proyecta que gastarás aproximadamente:</p>
+          <h4 class="text-center {% if projected_expenses > monthly_income %}text-danger{% else %}text-primary{% endif %}">
+            {{ currency }} {{ projected_expenses|floatformat:2 }}
+          </h4>
+          <p class="text-center small text-muted">
+            {% if projected_expenses > monthly_income %}
+            Esto representa un {{ projection_vs_income_pct|floatformat:1 }}% más que tus ingresos actuales.
+            {% else %}
+            Esto representa un {{ projection_vs_income_pct|floatformat:1 }}% de tus ingresos actuales.
+            {% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-lightbulb me-2"></i>Recomendaciones</h5>
+      </div>
+      <div class="card-body">
+        <ul class="list-group">
+          {% for recommendation in recommendations %}
+          <li class="list-group-item">
+            <div class="d-flex">
+              <div class="me-3">
+                <i class="fa-solid {{ recommendation.icon }} text-{{ recommendation.color }}"></i>
+              </div>
+              <div>
+                <h6 class="mb-1">{{ recommendation.title }}</h6>
+                <p class="mb-0 text-muted">{{ recommendation.description }}</p>
+              </div>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // Parse the chart data from Django
-    const pieChartData = JSON.parse('{{ pie_chart_data|safe }}');
-    const barChartData = JSON.parse('{{ bar_chart_data|safe }}');
-    const trendChartData = JSON.parse('{{ trend_chart_data|safe }}');
+  // Configuración de los gráficos
+  document.addEventListener('DOMContentLoaded', function() {
+    // Declarar las variables de datos para los gráficos
+    let pieChartData = {};
+    let dailyTrendChartData = {};
+    let sixMonthTrendData = {};
     
-    // Create pie chart
-    const ctxPie = document.getElementById('expensesByCategoryPie').getContext('2d');
-    const expensesByCategoryPieChart = new Chart(ctxPie, {
+    // Intentar parsear los datos JSON que vienen del contexto
+    try {
+      pieChartData = JSON.parse('{{ pie_chart_data|safe|escapejs }}');
+      dailyTrendChartData = JSON.parse('{{ daily_trend_chart_data|safe|escapejs }}');
+      sixMonthTrendData = JSON.parse('{{ six_month_trend_data|safe|escapejs }}');
+    } catch (e) {
+      console.error('Error al parsear los datos de los gráficos:', e);
+      pieChartData = { labels: [], datasets: [{ data: [], backgroundColor: [] }] };
+      dailyTrendChartData = { labels: [], datasets: [{ data: [], backgroundColor: [], borderColor: [] }] };
+      sixMonthTrendData = { labels: [], datasets: [{ data: [], backgroundColor: [] }] };
+    }
+    
+    // Gráfico de gastos por categoría
+    const expensesChartCtx = document.getElementById('expensesChart');
+    if (expensesChartCtx) {
+      const expensesChart = new Chart(expensesChartCtx.getContext('2d'), {
         type: 'doughnut',
         data: pieChartData,
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            const value = context.raw;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = Math.round((value / total * 100) * 10) / 10;
-                            label += '{{ currency }} ' + value.toFixed(2) + ' (' + percentage + '%)';
-                            return label;
-                        }
-                    }
-                }
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'right',
             },
-            cutout: '60%'
-        }
-    });
-    
-    // Create bar chart
-    const ctxBar = document.getElementById('expensesByCategoryBar').getContext('2d');
-    const expensesByCategoryBarChart = new Chart(ctxBar, {
-        type: 'bar',
-        data: barChartData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return '{{ currency }} ' + value.toFixed(0);
-                        }
-                    }
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.parsed || 0;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = Math.round((value / total) * 100);
+                  return `${label}: ${percentage}% ({{ currency }} ${value.toFixed(2)})`;
                 }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            label += '{{ currency }} ' + context.raw.toFixed(2);
-                            return label;
-                        }
-                    }
-                }
+              }
             }
+          },
+          cutout: '60%'
         }
-    });
+      });
+    } else {
+      console.error('No se encontró el elemento expensesChart');
+    }
     
-    // Create trend chart
-    const ctxTrend = document.getElementById('expenseTrend').getContext('2d');
-    const expenseTrendChart = new Chart(ctxTrend, {
+    // Gráfico de tendencia diaria
+    const dailyTrendChartCtx = document.getElementById('dailyTrendChart');
+    if (dailyTrendChartCtx) {
+      const dailyTrendChart = new Chart(dailyTrendChartCtx.getContext('2d'), {
         type: 'line',
-        data: trendChartData,
+        data: dailyTrendChartData,
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    grid: {
-                        drawBorder: false,
-                        display: false
-                    }
-                },
-                y: {
-                    grid: {
-                        drawBorder: false,
-                        display: true
-                    },
-                    ticks: {
-                        callback: function(value) {
-                            return '{{ currency }} ' + value.toFixed(0);
-                        }
-                    }
-                }
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'top',
             },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            label += '{{ currency }} ' + context.raw.toFixed(2);
-                            return label;
-                        }
-                    }
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `${context.dataset.label}: {{ currency }} ${context.parsed.y.toFixed(2)}`;
                 }
+              }
             }
+          },
+          scales: {
+            x: {
+              ticks: {
+                maxRotation: 45,
+                minRotation: 45
+              }
+            },
+            y: {
+              beginAtZero: true
+            }
+          }
         }
-    });
+      });
+    } else {
+      console.error('No se encontró el elemento dailyTrendChart');
+    }
     
-    // Initialize date inputs with current values
-    document.addEventListener('DOMContentLoaded', function() {
-        const startDateInput = document.getElementById('id_start_date');
-        const endDateInput = document.getElementById('id_end_date');
-        
-        if (startDateInput && !startDateInput.value) {
-            startDateInput.value = '{{ start_date|date:"Y-m-d" }}';
+    // Gráfico de tendencia de 6 meses
+    const sixMonthTrendChartCtx = document.getElementById('sixMonthTrendChart');
+    if (sixMonthTrendChartCtx) {
+      const sixMonthTrendChart = new Chart(sixMonthTrendChartCtx.getContext('2d'), {
+        type: 'bar',
+        data: sixMonthTrendData,
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `Gastos: {{ currency }} ${context.parsed.y.toFixed(2)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
         }
-        
-        if (endDateInput && !endDateInput.value) {
-            endDateInput.value = '{{ end_date|date:"Y-m-d" }}';
-        }
-    });
+      });
+    } else {
+      console.error('No se encontró el elemento sixMonthTrendChart');
+    }
+  });
 </script>
 {% endblock %}
